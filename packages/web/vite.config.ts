@@ -8,11 +8,11 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
         changeOrigin: true,
       },
       '/images': {
-        target: 'http://localhost:3002',
+        target: process.env.VITE_MCP_SERVER_URL || 'http://localhost:3002',
         changeOrigin: true,
       },
     },

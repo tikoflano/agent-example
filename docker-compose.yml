@@ -6,17 +6,30 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
-      test: ['CMD-SHELL', 'curl -sf http://localhost:11434/api/tags || exit 1']
-      interval: 10s
+      test: ['CMD', 'ollama', 'list']
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  ollama-pull:
+    image: ollama/ollama
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ['sh', '-c', 'ollama pull ${OLLAMA_MODEL:-llama3.2}']
+    restart: 'no'
 
   mcp-server:
     build:
       context: .
       dockerfile: Dockerfile.dev
     volumes:
-      - .:/workspace
+      - ./packages/mcp-server/src:/workspace/packages/mcp-server/src
+      - generated_images:/workspace/.generated-images
     ports:
       - '3002:3002'
     command: pnpm --filter @agent-example/mcp-server dev
@@ -24,14 +37,15 @@ services:
       test: ['CMD-SHELL', 'curl -sf http://localhost:3002/health || exit 1']
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 15
+      start_period: 10s
 
   agent:
     build:
       context: .
       dockerfile: Dockerfile.dev
     volumes:
-      - .:/workspace
+      - ./packages/agent/src:/workspace/packages/agent/src
     ports:
       - '3001:3001'
     environment:
@@ -40,22 +54,23 @@ services:
       MCP_SERVER_URL: http://mcp-server:3002
     command: pnpm --filter @agent-example/agent dev
     depends_on:
-      ollama:
-        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
       mcp-server:
         condition: service_healthy
     healthcheck:
       test: ['CMD-SHELL', 'curl -sf http://localhost:3001/health || exit 1']
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 15
+      start_period: 10s
 
   api:
     build:
       context: .
       dockerfile: Dockerfile.dev
     volumes:
-      - .:/workspace
+      - ./packages/api/src:/workspace/packages/api/src
     ports:
       - '3000:3000'
     environment:
@@ -70,12 +85,17 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     volumes:
-      - .:/workspace
+      - ./packages/web/src:/workspace/packages/web/src
+      - ./packages/web/index.html:/workspace/packages/web/index.html
     ports:
       - '5173:5173'
+    environment:
+      VITE_API_URL: http://api:3000
+      VITE_MCP_SERVER_URL: http://mcp-server:3002
     command: pnpm --filter @agent-example/web dev
     depends_on:
       - api
 
 volumes:
   ollama_data:
+  generated_images:
