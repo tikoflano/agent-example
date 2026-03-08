@@ -1,0 +1,81 @@
+services:
+  ollama:
+    image: ollama/ollama
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:11434/api/tags || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/workspace
+    ports:
+      - '3002:3002'
+    command: pnpm --filter @agent-example/mcp-server dev
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:3002/health || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/workspace
+    ports:
+      - '3001:3001'
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      MCP_SERVER_URL: http://mcp-server:3002
+    command: pnpm --filter @agent-example/agent dev
+    depends_on:
+      ollama:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:3001/health || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/workspace
+    ports:
+      - '3000:3000'
+    environment:
+      AGENT_URL: http://agent:3001
+    command: pnpm --filter @agent-example/api dev
+    depends_on:
+      agent:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/workspace
+    ports:
+      - '5173:5173'
+    command: pnpm --filter @agent-example/web dev
+    depends_on:
+      - api
+
+volumes:
+  ollama_data:

@@ -1,0 +1,16 @@
+{
+  "name": "@agent-example/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@agent-example/shared": "workspace:*",
+    "@hono/node-server": "^1.0.0",
+    "hono": "^4.0.0"
+  }
+}
