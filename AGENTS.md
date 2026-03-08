@@ -38,10 +38,19 @@ pnpm format:check  # Prettier
 npx tsc --noEmit -p packages/<pkg>/tsconfig.json   # per-package type check
 ```
 
-### Known issues
+### MCP tool bridge
 
-- **MCP tool calling**: Mastra v1.10 + `@ai-sdk/openai-compatible` + Ollama does not properly execute MCP tools. Tool descriptions get injected into the system prompt but actual structured tool calling doesn't trigger. The agent starts with `ENABLE_MCP_TOOLS=false` by default. This is a Mastra/AI SDK v5 interop issue to iterate on.
+`@mastra/mcp`'s `listTools()` returns tools with zod v3 schemas that are incompatible with AI SDK v5 (zod v4). The agent uses a custom bridge (`packages/agent/src/mcp-bridge.ts`) that:
+1. Connects to the MCP server using `@modelcontextprotocol/sdk` client via SSE
+2. Lists tools and wraps their JSON Schema definitions as AI SDK v5 `dynamicTool()` objects
+3. Each tool's `execute` function calls back to the MCP server via the SDK client
+
+This bridge is transparent — add tools to the MCP server and they appear in the agent automatically on restart.
+
+### Known caveats
+
 - **Docker**: This environment runs Docker-in-Docker. Requires `fuse-overlayfs` storage driver and `iptables-legacy`. See the `Dockerfile.dev` and `docker-compose.yml`.
+- **llama3.2 3B**: The small model sometimes makes multiple tool call attempts before succeeding (it may pass string args where numbers are expected). This is a model limitation, not a code bug. Larger models (e.g. `llama3.1:8b`) handle tool calling more reliably.
 
 ### Model swapping
 
