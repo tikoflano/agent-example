@@ -38,7 +38,7 @@ async function initAgent() {
     instructions: [
       'You are a helpful local AI assistant.',
       Object.keys(tools).length > 0
-        ? 'You have access to tools. Use them when the user asks for calculations, the current time, or random numbers. Always use tools when they are relevant — do not make up answers for questions tools can answer.'
+        ? 'You have access to tools. Use them when the user asks for calculations, the current time, random numbers, or image generation. Always use tools when they are relevant — do not make up answers for questions tools can answer. When you generate an image, always include the Image URL from the tool result in your response so the user can see it.'
         : '',
       'Be concise and helpful.',
     ]
@@ -76,11 +76,32 @@ app.post('/chat', async (c) => {
       body.messages.map((m) => ({ role: m.role, content: m.content })) as Parameters<
         typeof agent.generate
       >[0],
+      { maxSteps: 5 },
     )
+
+    let content = response.text
+
+    const imageUrlRe = /https?:\/\/[^\s"]+\.(?:png|jpg|jpeg|gif|svg|webp)/gi
+    const toolResultTexts = (response.toolResults ?? [])
+      .map((r: unknown) => {
+        const obj = r as Record<string, unknown>
+        const payload = obj?.payload as Record<string, unknown> | undefined
+        const result = payload?.result ?? obj?.result
+        return typeof result === 'string' ? result : JSON.stringify(result ?? '')
+      })
+      .join(' ')
+    const imageUrls = toolResultTexts.match(imageUrlRe) ?? []
+    for (const url of imageUrls) {
+      if (!content.includes(url)) {
+        const localUrl = url.replace(/https?:\/\/[^/]+/, '')
+        content += `\n${localUrl}`
+      }
+    }
+
     return c.json({
       message: {
         role: 'assistant' as const,
-        content: response.text,
+        content,
       },
     })
   } catch (error) {

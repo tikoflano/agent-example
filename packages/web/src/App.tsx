@@ -1,6 +1,49 @@
 import { useState, useRef, useEffect } from 'react'
 import type { ChatMessage } from '@agent-example/shared'
 
+const IMAGE_URL_RE =
+  /(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|svg|webp))|(\/?images\/[^\s]+\.(?:png|jpg|jpeg|gif|svg|webp))/gi
+
+function MessageContent({ text }: { text: string }) {
+  const parts: Array<{ type: 'text' | 'image'; value: string }> = []
+  let lastIndex = 0
+
+  for (const match of text.matchAll(IMAGE_URL_RE)) {
+    const url = match[0]
+    const idx = match.index!
+    if (idx > lastIndex) {
+      parts.push({ type: 'text', value: text.slice(lastIndex, idx) })
+    }
+    parts.push({ type: 'image', value: url })
+    lastIndex = idx + url.length
+  }
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', value: text.slice(lastIndex) })
+  }
+
+  if (parts.length === 0) {
+    return <span>{text}</span>
+  }
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.type === 'image' ? (
+          <img
+            key={i}
+            src={part.value}
+            alt="Generated image"
+            style={styles.generatedImage}
+            loading="lazy"
+          />
+        ) : (
+          <span key={i}>{part.value}</span>
+        ),
+      )}
+    </>
+  )
+}
+
 export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -57,7 +100,8 @@ export function App() {
             Send a message to start chatting with your local agent.
             <br />
             <span style={styles.hint}>
-              Try: &quot;What time is it?&quot; or &quot;Calculate 42 * 17&quot;
+              Try: &quot;What time is it?&quot;, &quot;Calculate 42 * 17&quot;, or &quot;Generate an
+              image of a sunset&quot;
             </span>
           </div>
         )}
@@ -70,7 +114,9 @@ export function App() {
             }}
           >
             <div style={styles.messageRole}>{msg.role === 'user' ? 'You' : 'Agent'}</div>
-            <div style={styles.messageContent}>{msg.content}</div>
+            <div style={styles.messageContent}>
+              <MessageContent text={msg.content} />
+            </div>
           </div>
         ))}
         {loading && (
@@ -151,6 +197,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   messageRole: { fontSize: 11, fontWeight: 600, marginBottom: 4, opacity: 0.6 },
   messageContent: { fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap' },
+  generatedImage: {
+    display: 'block',
+    maxWidth: '100%',
+    borderRadius: 8,
+    marginTop: 8,
+    marginBottom: 4,
+    border: '1px solid #333',
+  },
   thinking: { fontSize: 14, opacity: 0.5, fontStyle: 'italic' },
   form: {
     display: 'flex',
