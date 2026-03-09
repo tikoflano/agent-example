@@ -36,6 +36,7 @@ Once you see all services healthy, open **http://localhost:5173** in your browse
 | **Agent** | [localhost:3001](http://localhost:3001/health) | Mastra agent + Ollama integration |
 | **MCP Server** | [localhost:3002](http://localhost:3002/health) | MCP tools via SSE |
 | **Ollama** | [localhost:11434](http://localhost:11434/api/tags) | Local LLM inference |
+| **ComfyUI** | [localhost:8188](http://localhost:8188) | Stable Diffusion (GPU profile only) |
 
 ## What you can do
 
@@ -44,7 +45,35 @@ Talk to the agent in the web UI or CLI. It has access to these MCP tools:
 - **Calculator** — "What is 123 * 456?"
 - **Date/Time** — "What time is it?"
 - **Random Number** — "Give me a random number between 1 and 100"
-- **Image Generation** — "Generate an image of a sunset" (mock backend — swap in Stable Diffusion when you have a GPU)
+- **Image Generation** — "Generate an image of a sunset" (mock backend by default; real Stable Diffusion with `--profile gpu`)
+
+## Image generation with Stable Diffusion (GPU)
+
+If you have an NVIDIA GPU, you can enable real image generation with SDXL Turbo:
+
+**Prerequisites:** [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
+```bash
+IMAGE_BACKEND=comfyui docker compose --profile gpu up
+```
+
+On first run this will:
+1. Build the ComfyUI container (~5 min)
+2. Download SDXL Turbo model (~6.9GB)
+3. Start ComfyUI with GPU acceleration
+
+Once running, ask the agent to generate images — they'll be real AI-generated images instead of mock SVGs.
+
+**Performance with SDXL Turbo at 512x512:**
+
+| GPU | Steps | Time |
+|---|---|---|
+| RTX 4090 (desktop) | 4 | ~400ms |
+| RTX 4090 (laptop) | 4 | ~500-700ms |
+| RTX 4090 + TensorRT | 4 | ~130ms |
+| RTX 3080 | 4 | ~800ms |
+
+> ComfyUI is available at [localhost:8188](http://localhost:8188) for direct use.
 
 ## Configuration
 
@@ -57,11 +86,21 @@ cp .env.example .env
 | Variable | Default | Description |
 |---|---|---|
 | `OLLAMA_MODEL` | `llama3.2` | Ollama model to use (auto-pulled on start) |
+| `IMAGE_BACKEND` | `mock` | Image backend: `mock` or `comfyui` |
+| `SD_MODEL` | `sd_xl_turbo_1.0_fp16.safetensors` | Stable Diffusion checkpoint |
+| `SD_STEPS` | `4` | Inference steps (1-4 for SDXL Turbo) |
 
-To use a different model:
+Examples:
 
 ```bash
+# Different LLM model
 OLLAMA_MODEL=mistral docker compose up
+
+# Enable GPU image generation
+IMAGE_BACKEND=comfyui docker compose --profile gpu up
+
+# Faster images (1 step, slightly lower quality)
+IMAGE_BACKEND=comfyui SD_STEPS=1 docker compose --profile gpu up
 ```
 
 ## Development (without Docker)
@@ -141,7 +180,12 @@ interface ImageBackend {
 }
 ```
 
-Currently ships with `MockImageBackend` (gradient SVGs with prompt text). To add real image generation, implement the interface with your preferred backend (Stable Diffusion, DALL-E, etc.) and swap it in `packages/mcp-server/src/index.ts`.
+Ships with two backends:
+
+- **`MockImageBackend`** — gradient SVGs with prompt text (default, no GPU needed)
+- **`StableDiffusionBackend`** — calls ComfyUI's API, uses SDXL Turbo for fast generation
+
+Backend selection is driven by the `IMAGE_BACKEND` env var. To add a new backend (DALL-E, Replicate, etc.), implement the `ImageBackend` interface and add a case to the factory in `packages/mcp-server/src/image-backend.ts`.
 
 ## License
 

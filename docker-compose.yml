@@ -23,6 +23,30 @@ services:
     entrypoint: ['sh', '-c', 'ollama pull ${OLLAMA_MODEL:-llama3.2}']
     restart: 'no'
 
+  comfyui:
+    profiles: ['gpu']
+    build:
+      context: ./comfyui
+    ports:
+      - '8188:8188'
+    volumes:
+      - comfyui_models:/app/models
+    environment:
+      SD_MODEL: ${SD_MODEL:-sd_xl_turbo_1.0_fp16.safetensors}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:8188/system_stats || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
   mcp-server:
     build:
       context: .
@@ -32,6 +56,11 @@ services:
       - generated_images:/workspace/.generated-images
     ports:
       - '3002:3002'
+    environment:
+      IMAGE_BACKEND: ${IMAGE_BACKEND:-mock}
+      COMFYUI_URL: http://comfyui:8188
+      SD_MODEL: ${SD_MODEL:-sd_xl_turbo_1.0_fp16.safetensors}
+      SD_STEPS: ${SD_STEPS:-4}
     command: pnpm --filter @agent-example/mcp-server dev
     healthcheck:
       test: ['CMD-SHELL', 'curl -sf http://localhost:3002/health || exit 1']
@@ -99,3 +128,4 @@ services:
 volumes:
   ollama_data:
   generated_images:
+  comfyui_models:

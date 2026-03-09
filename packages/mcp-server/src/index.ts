@@ -4,10 +4,10 @@ import express from 'express'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { PORTS } from '@agent-example/shared'
-import { MockImageBackend } from './image-backend.js'
+import { createImageBackend } from './image-backend.js'
 
 const IMAGES_DIR = join(process.cwd(), '.generated-images')
-const imageBackend = new MockImageBackend(IMAGES_DIR)
+const imageBackend = createImageBackend(IMAGES_DIR)
 
 const baseUrl = process.env.MCP_SERVER_PUBLIC_URL || `http://localhost:${PORTS.MCP_SERVER}`
 

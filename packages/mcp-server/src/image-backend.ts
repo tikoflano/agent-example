@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { StableDiffusionBackend } from './sd-backend.js'
 
 export interface ImageOptions {
   width?: number
@@ -14,6 +15,27 @@ export interface GeneratedImage {
 
 export interface ImageBackend {
   generate(prompt: string, options?: ImageOptions): Promise<GeneratedImage>
+}
+
+export function createImageBackend(imagesDir: string): ImageBackend {
+  const backend = process.env.IMAGE_BACKEND || 'mock'
+
+  switch (backend) {
+    case 'comfyui':
+    case 'stable-diffusion': {
+      const comfyuiUrl = process.env.COMFYUI_URL || 'http://localhost:8188'
+      const model = process.env.SD_MODEL || 'sd_xl_turbo_1.0_fp16.safetensors'
+      const steps = parseInt(process.env.SD_STEPS || '4', 10)
+      console.log(
+        `[Image] Using Stable Diffusion backend (${comfyuiUrl}, ${model}, ${steps} steps)`,
+      )
+      return new StableDiffusionBackend({ comfyuiUrl, imagesDir, model, steps })
+    }
+    case 'mock':
+    default:
+      console.log('[Image] Using mock backend (gradient SVGs)')
+      return new MockImageBackend(imagesDir)
+  }
 }
 
 const GRADIENTS: [string, string][] = [
