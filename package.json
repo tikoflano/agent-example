@@ -1,0 +1,35 @@
+{
+  "name": "agent-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "docker compose up",
+    "dev:web": "pnpm --filter @agent-example/web dev",
+    "dev:cli": "pnpm --filter @agent-example/cli dev",
+    "dev:api": "pnpm --filter @agent-example/api dev",
+    "dev:agent": "pnpm --filter @agent-example/agent dev",
+    "dev:mcp-server": "pnpm --filter @agent-example/mcp-server dev",
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^25.3.5",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=20"
+  }
+}

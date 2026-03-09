@@ -1,0 +1,20 @@
+{
+  "name": "@agent-example/agent",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@agent-example/shared": "workspace:*",
+    "@ai-sdk/openai-compatible": "^2.0.35",
+    "@hono/node-server": "^1.0.0",
+    "@mastra/core": "latest",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "ai": "^6.0.116",
+    "hono": "^4.0.0"
+  }
+}

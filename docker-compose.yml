@@ -1,0 +1,131 @@
+services:
+  ollama:
+    image: ollama/ollama
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ['CMD', 'ollama', 'list']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama-pull:
+    image: ollama/ollama
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ['sh', '-c', 'ollama pull ${OLLAMA_MODEL:-llama3.2}']
+    restart: 'no'
+
+  comfyui:
+    profiles: ['gpu']
+    build:
+      context: ./comfyui
+    ports:
+      - '8188:8188'
+    volumes:
+      - comfyui_models:/app/models
+    environment:
+      SD_MODEL: ${SD_MODEL:-sd_xl_turbo_1.0_fp16.safetensors}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:8188/system_stats || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./packages/mcp-server/src:/workspace/packages/mcp-server/src
+      - generated_images:/workspace/.generated-images
+    ports:
+      - '3002:3002'
+    environment:
+      IMAGE_BACKEND: ${IMAGE_BACKEND:-mock}
+      COMFYUI_URL: http://comfyui:8188
+      SD_MODEL: ${SD_MODEL:-sd_xl_turbo_1.0_fp16.safetensors}
+      SD_STEPS: ${SD_STEPS:-4}
+    command: pnpm --filter @agent-example/mcp-server dev
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:3002/health || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./packages/agent/src:/workspace/packages/agent/src
+    ports:
+      - '3001:3001'
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      MCP_SERVER_URL: http://mcp-server:3002
+    command: pnpm --filter @agent-example/agent dev
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+      mcp-server:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:3001/health || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./packages/api/src:/workspace/packages/api/src
+    ports:
+      - '3000:3000'
+    environment:
+      AGENT_URL: http://agent:3001
+    command: pnpm --filter @agent-example/api dev
+    depends_on:
+      agent:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./packages/web/src:/workspace/packages/web/src
+      - ./packages/web/index.html:/workspace/packages/web/index.html
+    ports:
+      - '5173:5173'
+    environment:
+      VITE_API_URL: http://api:3000
+      VITE_MCP_SERVER_URL: http://mcp-server:3002
+    command: pnpm --filter @agent-example/web dev
+    depends_on:
+      - api
+
+volumes:
+  ollama_data:
+  generated_images:
+  comfyui_models:

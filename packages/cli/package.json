@@ -1,0 +1,14 @@
+{
+  "name": "@agent-example/cli",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@agent-example/shared": "workspace:*"
+  }
+}
